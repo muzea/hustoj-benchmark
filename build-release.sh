@@ -1,5 +1,6 @@
 #!/bin/bash
 BUILD_DIR=$(dirname "$0")/build
+yarn
 yarn build
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
