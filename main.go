@@ -18,7 +18,8 @@ import (
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/muzea/measure"
+	cr "github.com/muzea/concurrency"
+	"github.com/muzea/counter"
 )
 
 type benchInfo struct {
@@ -148,21 +149,22 @@ func handleBench(ws *websocket.Conn, data wsData) {
 		Stage: "benching",
 	})
 
-	m := measure.NewMeasure()
 	start := time.Now()
+	concurrency, err := strconv.Atoi(bi.concurrency)
+	total, err := strconv.Atoi(bi.total)
 
-	count50x := 0
-	count200 := 0
-	countUnknown := 0
+	count50x := counter.NewCounter(0, total)
+	count200 := counter.NewCounter(0, total)
+	countUnknown := counter.NewCounter(0, total)
 	var l sync.Mutex
 	var updateBenchResult = func(stage string) {
 		elapsed := time.Since(start).Milliseconds()
 		var nextData benchResult = benchResult{
 			Stage:        stage,
 			ID:           data.ID,
-			Count200:     count200,
-			Count50x:     count50x,
-			CountUnknown: countUnknown,
+			Count200:     count200.Value(),
+			Count50x:     count50x.Value(),
+			CountUnknown: countUnknown.Value(),
 			Timecost:     int(elapsed),
 		}
 		l.Lock()
@@ -170,7 +172,7 @@ func handleBench(ws *websocket.Conn, data wsData) {
 		l.Unlock()
 	}
 
-	m.Stage("submit", func(runIndex int) int {
+	cr.Run(func(runIndex int) {
 		resp, err := client.PostForm(submitURL, url.Values{
 			"id":       {bi.problem_id},
 			"language": {"0"},
@@ -178,34 +180,34 @@ func handleBench(ws *websocket.Conn, data wsData) {
 		})
 		if err != nil {
 			fmt.Println(err)
-			countUnknown++
+			countUnknown.Plus(1)
 			go updateBenchResult("bench_update")
-			return 0
+			return
 		}
 		if resp.StatusCode >= 500 && resp.StatusCode <= 599 {
-			count50x++
+			count50x.Plus(1)
 			go updateBenchResult("bench_update")
-			return 0
+			return
 		}
 		body, _ := ioutil.ReadAll(resp.Body)
 		if resp.StatusCode == http.StatusOK {
 			if r.MatchString(string(body[:])) {
-				count200++
+				count200.Plus(1)
 				go updateBenchResult("bench_update")
-				return 1
+				return
 			}
 		}
-		countUnknown++
+		countUnknown.Plus(1)
 		// fmt.Println("dump resp ", runIndex)
 		// fmt.Println("[", string(body[:]), "]")
 		go updateBenchResult("bench_update")
-		return 0
-	})
-	concurrency, err := strconv.Atoi(bi.concurrency)
-	total, err := strconv.Atoi(bi.total)
-	m.Run(concurrency, total)
+		return
+	}, concurrency, total)
 	elapsed := time.Since(start)
 	fmt.Printf("total cost -> %dms\n", elapsed/time.Millisecond)
+	count50x.Flush()
+	count200.Flush()
+	countUnknown.Flush()
 	updateBenchResult("bench_end")
 }
 
