@@ -205,9 +205,11 @@ export default {
               job.count200 = count200;
               job.count50x = count50x;
               job.countUnknown = countUnknown;
-              job.progress =
-                (100 * (count200 + count50x + countUnknown)) /
+              const progress = (100 * (count200 + count50x + countUnknown)) /
                 _serverConfig.total;
+              const progressFixed = progress.toFixed(2);
+              job.progress = progressFixed.endsWith('.00') ? progress : progressFixed;
+                
               job.timecost = timecost;
               job.qps = (count200 / (timecost / 1000)).toFixed(1);
             }
