@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"mime"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -253,5 +254,6 @@ func websocketGin() {
 }
 
 func main() {
+	mime.AddExtensionType(".js", "application/javascript")
 	websocketGin()
 }
