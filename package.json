@@ -6,12 +6,12 @@
   "author": "muzea <mr.muzea@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "start": "vite ./web",
-    "build": "vite build ./web --outDir ./build/public"
+    "start": "vite --root ./web",
+    "build": "vite build --root ./web --outDir ./build/public"
   },
   "devDependencies": {
     "less": "^3.12.2",
-    "vite": "^1.0.0-rc.13"
+    "vite": "1.0.0-rc.4"
   },
   "dependencies": {
     "purecss": "^2.0.3",

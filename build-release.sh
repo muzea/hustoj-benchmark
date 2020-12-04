@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 BUILD_DIR=$(dirname "$0")/build
 yarn
 yarn build
