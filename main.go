@@ -2,8 +2,10 @@ package main
 
 import (
 	"crypto/md5"
+	"embed"
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"log"
 	"mime"
@@ -239,18 +241,62 @@ func jsonApi(c *gin.Context) {
 	}
 }
 
+//go:embed build/public/*
+var staticFS embed.FS
+
+type embedFileSystem struct {
+	http.FileSystem
+	indexes bool
+}
+
+func (e embedFileSystem) Exists(prefix string, path string) bool {
+	f, err := e.Open(path)
+	if err != nil {
+		return false
+	}
+
+	s, _ := f.Stat()
+	if s.IsDir() && !e.indexes {
+		return false
+	}
+
+	return true
+}
+
+func EmbedFolder(fsEmbed embed.FS, targetPath string, index bool) static.ServeFileSystem {
+	subFS, err := fs.Sub(fsEmbed, targetPath)
+	if err != nil {
+		panic(err)
+	}
+	return embedFileSystem{
+		FileSystem: http.FS(subFS),
+		indexes:    index,
+	}
+}
+
 func websocketGin() {
 	r := gin.Default()
 	r.Use(cors.Default())
 	r.GET("/ws", jsonApi)
 
-	r.Use(static.Serve("/", static.LocalFile("./public", true)))
+	fs := EmbedFolder(staticFS, "build/public", true)
+	r.Use(static.Serve("/", fs))
 
 	r.NoRoute(func(c *gin.Context) {
 		c.File("./public/index.html")
 	})
 
 	r.Run(":8000")
+}
+
+func mustFS() http.FileSystem {
+	sub, err := fs.Sub(staticFS, "build/public")
+
+	if err != nil {
+		panic(err)
+	}
+
+	return http.FS(sub)
 }
 
 func main() {
